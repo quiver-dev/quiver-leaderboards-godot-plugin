@@ -1,0 +1,128 @@
+[gd_scene load_steps=3 format=3 uid="uid://cvo3308nyt815"]
+
+[ext_resource type="Script" path="res://test.gd" id="1_yxj0h"]
+[ext_resource type="PackedScene" uid="uid://dgygkbtm0burn" path="res://addons/quiver_leaderboards/leaderboard_ui.tscn" id="2_a4j0t"]
+
+[node name="Test" type="Node"]
+script = ExtResource("1_yxj0h")
+
+[node name="Panel" type="Panel" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 45
+
+[node name="Titles" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="Title" type="Label" parent="Panel/MarginContainer/VBoxContainer/Titles"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_font_sizes/font_size = 44
+text = "Quiver Leaderboards Test"
+horizontal_alignment = 1
+
+[node name="Warning" type="Label" parent="Panel/MarginContainer/VBoxContainer/Titles"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_colors/font_color = Color(0.929412, 0.513726, 0.329412, 1)
+theme_override_font_sizes/font_size = 22
+text = "Note: This will add real data to your leaderboard, so using a test leaderboard is recommended. You can manually delete data in the web dashboard."
+horizontal_alignment = 1
+
+[node name="ScoreInput" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/separation = 8
+
+[node name="LeaderboardRow" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScoreInput"]
+layout_mode = 2
+theme_override_constants/separation = 25
+alignment = 1
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/LeaderboardRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Leaderboard ID:"
+
+[node name="IdLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/LeaderboardRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 32
+placeholder_text = "Enter the Leaderboard ID from the Quiver dashboard here"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScoreInput"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 20
+
+[node name="PostScoreButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Post a random score	"
+
+[node name="GetScoresButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Get all scores"
+
+[node name="GetCurrentPlayerScoresButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+disabled = true
+text = "Get scores for current player"
+
+[node name="GetNearbyScoresButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+disabled = true
+text = "Get nearby scores"
+
+[node name="QuitButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Quit"
+
+[node name="LeaderboardUI" parent="Panel/MarginContainer/VBoxContainer" instance=ExtResource("2_a4j0t")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Panel/MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 8
+theme_override_colors/font_color = Color(0.647059, 0.552941, 0.203922, 1)
+theme_override_font_sizes/font_size = 32
+text = "Status message"
+horizontal_alignment = 1
+
+[node name="Timer" type="Timer" parent="."]
+
+[connection signal="text_changed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/LeaderboardRow/IdLineEdit" to="." method="_on_id_line_edit_text_changed"]
+[connection signal="pressed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow/PostScoreButton" to="." method="_on_post_score_button_pressed"]
+[connection signal="pressed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow/GetScoresButton" to="." method="_on_get_scores_button_pressed"]
+[connection signal="pressed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow/GetCurrentPlayerScoresButton" to="." method="_on_get_scores_current_player_button_pressed"]
+[connection signal="pressed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow/GetNearbyScoresButton" to="." method="_on_get_nearby_scores_button_pressed"]
+[connection signal="pressed" from="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow/QuitButton" to="." method="_on_quit_button_pressed"]

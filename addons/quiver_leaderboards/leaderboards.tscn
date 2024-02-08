@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://dkkmsn60aqj0x"]
+
+[ext_resource type="Script" path="res://addons/quiver_leaderboards/leaderboards.gd" id="1_2h7vw"]
+
+[node name="Leaderboards" type="Node"]
+script = ExtResource("1_2h7vw")
+
+[node name="HTTPRequest" type="HTTPRequest" parent="."]
