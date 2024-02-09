@@ -94,7 +94,7 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ## The offset must be an integer zero or greater.
 ## The limit must be an integer between 1 and 50.
 ##
-## Returns a dictionary, with keys "scores" and "has_more_scores".
+## Returns a dictionary, with keys "scores", "has_more_scores", and "error".
 ## "scores" contains an ordered array of dictionary with the score data at the given offset.
 ##   The score data contains the keys:
 ##     "name": A string. Can be blank if no nickname was provided when this score was posted.
@@ -103,17 +103,19 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ##     "timestamp": A float. The UNIX time in seconds when this score was posted.
 ##     "metadata": A dictionary. Includes any metadata that was attached to this score when it was posted.
 ## "has_more_scores" is a Boolean specifying whether there are more available scores to fetch.
+## "error" is a string with an error message if present or empty otherwise
 ## Example return value:
 ## {
 ##   "scores: [
 ##     {"name": "Aang", "score": 500, "rank": 1, timestamp: 1706824170.389251, metadata: {}},
 ##     {"name": "Katara", "score": 300, "rank": 2, timestamp: 1706821234.123456, metadata: {}}
 ##   ],
-##   "has_more_scores": false
+##   "has_more_scores": false,
+##   "error": ""
 ## }
 func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10) -> Dictionary:
 	if not _validate_score_params(offset, limit):
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d" % [offset, limit]
 	return await _get_scores_base(leaderboard_id, auth_token, GET_SCORES_PATH, query_string)
 
@@ -130,7 +132,7 @@ func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10) -> Dic
 ## Return value is the same as get_scores()
 func get_scores_within_time_period(leaderboard_id, offset=0, limit=10, start_time=0.0, end_time=Leaderboards.MAX_UNIX_TIME):
 	if not _validate_score_params(offset, limit):
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d&start_time=%f&end_time=%f" % [offset, limit, start_time, end_time]
 	return await _get_scores_base(leaderboard_id, auth_token, GET_SCORES_PATH, query_string)
 
@@ -149,7 +151,7 @@ func get_scores_within_time_period(leaderboard_id, offset=0, limit=10, start_tim
 ## Return value is the same as get_scores()
 func get_player_scores(leaderboard_id, offset=0, limit=10) -> Dictionary:
 	if not _validate_score_params(offset, limit):
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d" % [offset, limit]
 	return await _get_scores_base(leaderboard_id, PlayerAccounts.player_token, GET_PLAYER_SCORES_PATH, query_string)
 
@@ -167,7 +169,7 @@ func get_player_scores(leaderboard_id, offset=0, limit=10) -> Dictionary:
 func get_nearby_scores(leaderboard_id, nearby_count=5, anchor=NearbyAnchor.BEST) -> Dictionary:
 	if nearby_count <= 0 or nearby_count > 25:
 		printerr("[Quiver Leaderboards] Nearby count must be between 1 and 25")
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var anchor_string := "best"
 	if anchor == NearbyAnchor.BEST:
 		anchor_string = "best"
@@ -192,10 +194,10 @@ func _get_scores_base(leaderboard_id: String, token: String, path: String, query
 	var has_more_scores := false
 	if not token:
 		printerr("[Quiver Leaderboards] Can't fetch scores due to missing token")
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Missing token"}
 	if _http_request_busy:
 		printerr("Couldn't get scores because request is in progress")
-		return {"scores": [], "has_more_scores": false}
+		return {"scores": [], "has_more_scores": false, "error": "Fetch request already in progres"}
 
 	_http_request_busy = true
 	var url = SERVER_PATH + path % leaderboard_id + query_string
@@ -204,8 +206,10 @@ func _get_scores_base(leaderboard_id: String, token: String, path: String, query
 		["Authorization: Token " + token],
 		HTTPClient.METHOD_GET
 	)
+	var error_msg := ""
 	if error != OK:
 		printerr("[Quiver Leaderboards] There was an error fetching scores.")
+		error_msg = "Request failed"
 	else:
 		var response = await http_request.request_completed
 		var response_code = response[1]
@@ -218,7 +222,9 @@ func _get_scores_base(leaderboard_id: String, token: String, path: String, query
 					has_more_scores = true
 			else:
 				printerr("[Quiver Leaderboards] There was an error while parsing score data")
+				error_msg = "Error parsing response"
 		else:
 			printerr("[Quiver Leaderboards] There was an error fetching scores.")
+			error_msg = "Request failed, HTTP code %d" % response_code
 	_http_request_busy = false
-	return {"scores": scores, "has_more_scores": has_more_scores}
+	return {"scores": scores, "has_more_scores": has_more_scores, "error": error_msg}

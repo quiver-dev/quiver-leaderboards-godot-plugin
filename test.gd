@@ -55,7 +55,7 @@ func _on_get_scores_button_pressed() -> void:
 		status_label.text = "Please set a valid leaderboard ID"
 		return
 	await leaderboard_ui.refresh_scores()
-	status_label.text = "Successfully fetched scores."
+	status_label.text = "Fetch complete."
 
 
 func _on_get_scores_current_player_button_pressed() -> void:
@@ -69,7 +69,7 @@ func _on_get_scores_current_player_button_pressed() -> void:
 		status_label.text = "Please set a valid leaderboard ID"
 		return
 	await leaderboard_ui.refresh_scores()
-	status_label.text = "Successfully fetched player scores."
+	status_label.text = "Fetch complete."
 
 
 func _on_get_nearby_scores_button_pressed() -> void:
@@ -83,7 +83,7 @@ func _on_get_nearby_scores_button_pressed() -> void:
 		status_label.text = "Please set a valid leaderboard ID"
 		return
 	await leaderboard_ui.refresh_scores()
-	status_label.text = "Successfully fetched nearby scores."
+	status_label.text = "Fetch complete."
 
 
 func _on_quit_button_pressed() -> void:
