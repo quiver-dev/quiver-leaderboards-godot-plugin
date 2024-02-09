@@ -1,7 +1,8 @@
 extends Node
 ## Handles sending scores to Quiver Leaderboards (https://quiver.dev/leaderboards/).
+## Requires installation of the Quiver Player Accounts plugin.
 ##
-## This class handles populating a given leaderboard, which are configured on the Quiver website.
+## This class handles populating leaderboards, which can be configured on the Quiver website.
 ## Leaderboards can have different update strategies:
 ## * All scores: Records all posted scores
 ## * Best score: Only record each player's best score
@@ -22,6 +23,7 @@ const POST_SCORE_PATH := "/leaderboards/%s/scores/post/"
 const GET_SCORES_PATH := "/leaderboards/%s/scores/"
 const GET_PLAYER_SCORES_PATH := "/leaderboards/%s/scores/player/"
 const GET_NEARBY_SCORES_PATH := "/leaderboards/%s/scores/nearby/"
+const MIN_UNIX_TIME := 0
 const MAX_UNIX_TIME := 2147483647.0
 
 var auth_token = ProjectSettings.get_setting("quiver/general/auth_token", "")
@@ -93,13 +95,16 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ## You can get the ID from the Leaderboards dashboard.
 ## The offset must be an integer zero or greater.
 ## The limit must be an integer between 1 and 50.
+## The start and end times are floats that denote Unix timestamps in seconds and will
+## restrict scores to this time period.
 ##
 ## Returns a dictionary, with keys "scores", "has_more_scores", and "error".
 ## "scores" contains an ordered array of dictionary with the score data at the given offset.
 ##   The score data contains the keys:
 ##     "name": A string. Can be blank if no nickname was provided when this score was posted.
 ##     "score": A float.
-##     "rank": An int. The rank of this score given this particular query.
+##     "rank": An int. The global rank of this score given this particular query and relative
+##       to the time period, if any.
 ##     "timestamp": A float. The UNIX time in seconds when this score was posted.
 ##     "metadata": A dictionary. Includes any metadata that was attached to this score when it was posted.
 ## "has_more_scores" is a Boolean specifying whether there are more available scores to fetch.
@@ -113,24 +118,7 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ##   "has_more_scores": false,
 ##   "error": ""
 ## }
-func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10) -> Dictionary:
-	if not _validate_score_params(offset, limit):
-		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
-	var query_string := "?offset=%d&limit=%d" % [offset, limit]
-	return await _get_scores_base(leaderboard_id, auth_token, GET_SCORES_PATH, query_string)
-
-
-## Get scores at the given offset, with the number of scores returned determined by the limit and between the start and end times.
-##
-##
-## leaderboard_id: int. Corresponds to the a leaderboard created on the Quiver website.
-## You can get the ID from the Leaderboards dashboard.
-## The offset must be an integer zero or greater.
-## The limit must be an integer between 1 and 50.
-## The start and end times are floats that denote Unix timestamps in seconds.
-##
-## Return value is the same as get_scores()
-func get_scores_within_time_period(leaderboard_id, offset=0, limit=10, start_time=0.0, end_time=Leaderboards.MAX_UNIX_TIME):
+func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
 	if not _validate_score_params(offset, limit):
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d&start_time=%f&end_time=%f" % [offset, limit, start_time, end_time]
@@ -146,13 +134,16 @@ func get_scores_within_time_period(leaderboard_id, offset=0, limit=10, start_tim
 ## You can get the ID from the Leaderboards dashboard.
 ## The offset must be an integer zero or greater.
 ## The limit must be an integer between 1 and 50.
-## Returns an array of scores.
+## The start and end times are floats that denote Unix timestamps in seconds and will
+## restrict scores to this time period.
 ##
 ## Return value is the same as get_scores()
-func get_player_scores(leaderboard_id, offset=0, limit=10) -> Dictionary:
+func get_player_scores(leaderboard_id, offset=0, limit=10, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
 	if not _validate_score_params(offset, limit):
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
-	var query_string := "?offset=%d&limit=%d" % [offset, limit]
+	if not PlayerAccounts.player_token:
+		return {"scores": [], "has_more_scores": false, "error": "No logged in player"}
+	var query_string := "?offset=%d&limit=%d&start_time=%f&end_time=%f" % [offset, limit, start_time, end_time]
 	return await _get_scores_base(leaderboard_id, PlayerAccounts.player_token, GET_PLAYER_SCORES_PATH, query_string)
 
 
@@ -162,20 +153,27 @@ func get_player_scores(leaderboard_id, offset=0, limit=10) -> Dictionary:
 ## You can get the ID from the Leaderboards dashboard.
 ## The nearby_count must be an integer between 1 and 25 and will return that number of scores
 ## above and below the current player's score.
-## The sort_order will determine which score to use as the reference score when using the
-## "All scores" update strategy. This parameter doesn't have an effect when other strategies are used.
+## The anchor will determine which score to use as the reference score when using the
+## "All scores" update strategy.
+##    NearbyAnchor.BEST will fetch scores near the player's best score
+##    NearbyAnchor.LATEST will fetch scores near the player's latest score
+##    Note that this parameter doesn't have an effect when other strategies are used.
+## The start and end times are floats that denote Unix timestamps in seconds and will
+## restrict scores to this time period.
 ##
 ## Return value is the same as get_scores()
-func get_nearby_scores(leaderboard_id, nearby_count=5, anchor=NearbyAnchor.BEST) -> Dictionary:
+func get_nearby_scores(leaderboard_id, nearby_count=5, anchor=NearbyAnchor.BEST, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
 	if nearby_count <= 0 or nearby_count > 25:
 		printerr("[Quiver Leaderboards] Nearby count must be between 1 and 25")
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
+	if not PlayerAccounts.player_token:
+		return {"scores": [], "has_more_scores": false, "error": "No logged in player"}
 	var anchor_string := "best"
 	if anchor == NearbyAnchor.BEST:
 		anchor_string = "best"
 	elif anchor == NearbyAnchor.LATEST:
 		anchor_string = "latest"
-	var query_string := "?nearby_count=%d&anchor=%s" % [nearby_count, anchor_string]
+	var query_string := "?nearby_count=%d&anchor=%s&start_time=%f&end_time=%f" % [nearby_count, anchor_string, start_time, end_time]
 	return await _get_scores_base(leaderboard_id, PlayerAccounts.player_token, GET_NEARBY_SCORES_PATH, query_string)
 
 
