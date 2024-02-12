@@ -6,3 +6,7 @@
 script = ExtResource("1_2h7vw")
 
 [node name="HTTPRequest" type="HTTPRequest" parent="."]
+
+[node name="RetryTimer" type="Timer" parent="."]
+
+[connection signal="timeout" from="RetryTimer" to="." method="_on_retry_timer_timeout"]

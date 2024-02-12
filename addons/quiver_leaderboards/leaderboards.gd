@@ -9,11 +9,21 @@ extends Node
 ## * Latest score: Only record each player's latest score
 ## * Cumulative score: Record the cumulative (sum) of each player's scores
 ##
-## If a score fails to post, this class will handle retries.
+## If a score fails to post, this class can be configured to handle retries.
 ## If the game is exited, this class will handle saving scores to disk for a later retry.
 
 enum ScoreFilter {ALL, PLAYER, NEARBY}
 enum NearbyAnchor {BEST, LATEST}
+
+## This controls the maximum size of the request queue that is saved to disk
+## in the situation the scores weren't able to be successfully posted.
+## In pathological cases, we drop the lowest scores if the queue grows too big.
+const MAX_FAILED_QUEUE_SIZE := 20
+
+const MAX_RETRY_TIME_SECONDS := 60
+
+## The file to store queue scores that weren't able to be sent due to network or server issues
+const FAILED_QUEUE_FILE_NAME := "user://leaderboards_queue"
 
 ## The server host
 const SERVER_PATH := "https://quiver.dev"
@@ -26,15 +36,23 @@ const GET_NEARBY_SCORES_PATH := "/leaderboards/%s/scores/nearby/"
 const MIN_UNIX_TIME := 0
 const MAX_UNIX_TIME := 2147483647.0
 
-var auth_token = ProjectSettings.get_setting("quiver/general/auth_token", "")
-var _http_request_busy = false
+var auth_token := ProjectSettings.get_setting("quiver/general/auth_token", "")
+var _failed_queue: Array[Dictionary] = []
+var _failed_queue_file: FileAccess = null
+var _http_request_busy: = false
+var _retry_time := 2.0
 
 @onready var http_request := $HTTPRequest
+@onready var retry_timer := $RetryTimer
 
 
 func _ready() -> void:
 	if not get_tree().root.has_node("PlayerAccounts"):
 		printerr("[Quiver Leaderboards] PlayerAccounts plugin must be installed to use Leaderboards. See documentation for details.")
+
+	_load_failed_queue_from_disk()
+	if not _failed_queue.is_empty():
+		_process_failed_queue()
 
 
 ## Posts a score from a guest player to the leaderboard with the given leaderboard ID.
@@ -45,43 +63,54 @@ func _ready() -> void:
 ## score: float. Expects a float, but it's fine to use integers as well.
 ## nickname: string (optional). A nickname to associate with this score.
 ## metadata: Dictionary (optional). A dictionary with additional information associated with this score.
+## timestamp: float (optional). If provided, uses this as the score's timestamp, otherwise uses the current time
+## automatically_retry: bool (default true). If true, the client will automatically handle retrying score posting
+## in the case of network or server failure.
 ##
 ## Returns a boolean indicating whether this operation completed successfully or not.
-func post_guest_score(leaderboard_id: String, score: float, nickname: String = "", metadata: Dictionary = {}) -> bool:
+## If this operation failed and automatically_retry is true, you do not need to post it again.
+## The built-in retry mechanism will try again until the operation succeeeds, even across game restarts.
+func post_guest_score(leaderboard_id: String, score: float, nickname: String = "", metadata: Dictionary = {}, timestamp: float = 0.0, automatically_retry: bool = true) -> bool:
+	var success := true
 	if not PlayerAccounts.is_logged_in():
-		var success: bool = await PlayerAccounts.register_guest()
-		if not success:
-			return false
+		success = await PlayerAccounts.register_guest()
 
 	if _http_request_busy:
 		printerr("Couldn't post score because request is in progress")
-		return false
+		success = false
 
-	_http_request_busy = true
-	var url = SERVER_PATH + (POST_SCORE_PATH % leaderboard_id)
-	var error = http_request.request(
-		url,
-		["Authorization: Token " + PlayerAccounts.player_token],
-		HTTPClient.METHOD_POST,
-		JSON.stringify({
-			"score": float(score),
-			"nickname": nickname,
-			"timestamp": Time.get_unix_time_from_system(),
-			"metadata": metadata,
-		})
-	)
-	if error != OK:
-		_http_request_busy = false
-		printerr("[Quiver Leaderboards] There was an error posting a score.")
-		return false
-	else:
-		var response = await http_request.request_completed
-		_http_request_busy = false
-		var response_code = response[1]
-		if response_code < 200 and response_code >= 300:
+	if success:
+		_http_request_busy = true
+		var url = SERVER_PATH + (POST_SCORE_PATH % leaderboard_id)
+		if timestamp == 0.0:
+			timestamp = Time.get_unix_time_from_system()
+		var error = http_request.request(
+			url,
+			["Authorization: Token " + PlayerAccounts.player_token],
+			HTTPClient.METHOD_POST,
+			JSON.stringify({
+				"score": float(score),
+				"nickname": nickname,
+				"timestamp": timestamp,
+				"metadata": metadata,
+			})
+		)
+		if error != OK:
+			_http_request_busy = false
 			printerr("[Quiver Leaderboards] There was an error posting a score.")
-			return false
-	return true
+			success = false
+		else:
+			var response = await http_request.request_completed
+			_http_request_busy = false
+			var response_code = response[1]
+			if response_code < 200 or response_code >= 300:
+				printerr("[Quiver Leaderboards] There was an error posting a score.")
+				success = false
+
+	if not success and automatically_retry:
+		_handle_failed_post("guest", leaderboard_id, float(score), nickname, metadata, timestamp)
+
+	return success
 
 
 func post_score(leaderboard_id: String, score: float) -> bool:
@@ -226,3 +255,99 @@ func _get_scores_base(leaderboard_id: String, token: String, path: String, query
 			error_msg = "Request failed, HTTP code %d" % response_code
 	_http_request_busy = false
 	return {"scores": scores, "has_more_scores": has_more_scores, "error": error_msg}
+
+
+func _load_failed_queue_from_disk():
+	var f = FileAccess.open(FAILED_QUEUE_FILE_NAME, FileAccess.READ)
+	if f:
+		while true:
+			var line := f.get_line()
+			if not line:
+				break
+			var failed_score = JSON.parse_string(line)
+			_failed_queue.append(failed_score)
+
+
+func _process_failed_queue():
+	if not _failed_queue.is_empty():
+		var score_to_retry = _failed_queue.back()
+		var success := await post_guest_score(
+			score_to_retry["leaderboard_id"],
+			score_to_retry["score"],
+			score_to_retry["nickname"],
+			score_to_retry["metadata"],
+			score_to_retry["timestamp"],
+			false
+		)
+		# If we fail to post the score again, let's exponentially back off retrying
+		if not success:
+			_retry_time = min(_retry_time * 2.0, MAX_RETRY_TIME_SECONDS)
+			retry_timer.start(_retry_time)
+		# Otherwise, we process the next item or clean up all the queue file
+		# if we've finished processing the queue
+		else:
+			_retry_time = 2.0
+			_failed_queue.pop_back()
+			if _failed_queue.is_empty():
+				if _failed_queue_file:
+					_failed_queue_file.close()
+				DirAccess.remove_absolute(FAILED_QUEUE_FILE_NAME)
+			else:
+				retry_timer.start(_retry_time)
+
+
+## Sorts the failed queue with the worst scores in the beginning of the queue
+## and the best at the end.
+func _failed_queue_sort(a, b):
+	if a["score"] < b["score"]:
+		return true
+	elif a["score"] > b["score"]:
+		return false
+	else:
+		if a["timestamp"] < b["timestamp"]:
+			return false
+		else:
+			return true
+
+
+func _handle_failed_post(type: String, leaderboard_id: String, score: float, nickname: String, metadata: Dictionary, timestamp: float):
+	# If the score fails to post, we immediately queue it up for retry and save it to disk.
+	# The reason we do both is we don't want to risk losing score data if the game unexpectedly quits.
+	var failed_score := {"type": type, "leaderboard_id": leaderboard_id, "score": score, "nickname": nickname, "metadata": metadata, "timestamp": timestamp}
+	_failed_queue.append(failed_score)
+
+	# If we exceed our maximum queue size, we'll drop the lowest score and
+	# rewrite the queue to the file.
+	if _failed_queue.size() > MAX_FAILED_QUEUE_SIZE:
+		# Sort with the worst scores first
+		_failed_queue.sort_custom(_failed_queue_sort)
+		# Drop the worst score
+		var dropped_score = _failed_queue.pop_front()
+		# Rewrite the queue file
+		if _failed_queue_file:
+			_failed_queue_file.close()
+		_failed_queue_file = FileAccess.open(FAILED_QUEUE_FILE_NAME, FileAccess.WRITE)
+		if _failed_queue_file:
+			for score_data in _failed_queue:
+				_failed_queue_file.store_line(JSON.stringify(score_data))
+			_failed_queue_file.close()
+		else:
+			printerr("[Quiver Leaderboards] Failed to save failed request to disk.")
+	else:
+		if not _failed_queue_file:
+			if FileAccess.file_exists(FAILED_QUEUE_FILE_NAME):
+				_failed_queue_file = FileAccess.open(FAILED_QUEUE_FILE_NAME, FileAccess.READ_WRITE)
+				_failed_queue_file.seek_end()
+			else:
+				_failed_queue_file = FileAccess.open(FAILED_QUEUE_FILE_NAME, FileAccess.WRITE)
+		if _failed_queue_file:
+			_failed_queue_file.store_line(JSON.stringify(failed_score))
+			_failed_queue_file.flush()
+		else:
+			printerr("[Quiver Leaderboards] Failed to save failed request to disk.")
+	if retry_timer.is_stopped():
+		_process_failed_queue()
+
+
+func _on_retry_timer_timeout() -> void:
+	_process_failed_queue()
