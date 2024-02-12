@@ -93,6 +93,7 @@ func post_guest_score(leaderboard_id: String, score: float, nickname := "", meta
 				"nickname": nickname,
 				"timestamp": timestamp,
 				"metadata": metadata,
+				"checksum": str(int(score) + int(timestamp)).md5_text()
 			})
 		)
 		if error != OK:
