@@ -70,7 +70,7 @@ func _ready() -> void:
 ## Returns a boolean indicating whether this operation completed successfully or not.
 ## If this operation failed and automatically_retry is true, you do not need to post it again.
 ## The built-in retry mechanism will try again until the operation succeeeds, even across game restarts.
-func post_guest_score(leaderboard_id: String, score: float, nickname: String = "", metadata: Dictionary = {}, timestamp: float = 0.0, automatically_retry: bool = true) -> bool:
+func post_guest_score(leaderboard_id: String, score: float, nickname := "", metadata := {}, timestamp := 0.0, automatically_retry := true) -> bool:
 	var success := true
 	if not PlayerAccounts.is_logged_in():
 		success = await PlayerAccounts.register_guest()
@@ -147,7 +147,7 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ##   "has_more_scores": false,
 ##   "error": ""
 ## }
-func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
+func get_scores(leaderboard_id: String, offset := 0, limit := 10, start_time := MIN_UNIX_TIME, end_time := MAX_UNIX_TIME) -> Dictionary:
 	if not _validate_score_params(offset, limit):
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d&start_time=%f&end_time=%f" % [offset, limit, start_time, end_time]
@@ -167,7 +167,7 @@ func get_scores(leaderboard_id: String, offset: int = 0, limit: int = 10, start_
 ## restrict scores to this time period.
 ##
 ## Return value is the same as get_scores()
-func get_player_scores(leaderboard_id, offset=0, limit=10, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
+func get_player_scores(leaderboard_id: String, offset := 0, limit := 10, start_time := MIN_UNIX_TIME, end_time := MAX_UNIX_TIME) -> Dictionary:
 	if not _validate_score_params(offset, limit):
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	if not PlayerAccounts.player_token:
@@ -191,7 +191,7 @@ func get_player_scores(leaderboard_id, offset=0, limit=10, start_time=MIN_UNIX_T
 ## restrict scores to this time period.
 ##
 ## Return value is the same as get_scores()
-func get_nearby_scores(leaderboard_id, nearby_count=5, anchor=NearbyAnchor.BEST, start_time=MIN_UNIX_TIME, end_time=MAX_UNIX_TIME) -> Dictionary:
+func get_nearby_scores(leaderboard_id: String, nearby_count := 5, anchor := NearbyAnchor.BEST, start_time := MIN_UNIX_TIME, end_time := MAX_UNIX_TIME) -> Dictionary:
 	if nearby_count <= 0 or nearby_count > 25:
 		printerr("[Quiver Leaderboards] Nearby count must be between 1 and 25")
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
@@ -216,7 +216,7 @@ func _validate_score_params(offset: int, limit: int):
 	return true
 
 
-func _get_scores_base(leaderboard_id: String, token: String, path: String, query_string: String = ""):
+func _get_scores_base(leaderboard_id: String, token: String, path: String, query_string := ""):
 	var scores := []
 	var has_more_scores := false
 	if not token:

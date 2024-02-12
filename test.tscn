@@ -79,7 +79,7 @@ theme_override_constants/separation = 20
 [node name="PostScoreButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "Post a random score	"
+text = "Post a random score as guest"
 
 [node name="GetScoresButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScoreInput/ButtonsRow"]
 layout_mode = 2
