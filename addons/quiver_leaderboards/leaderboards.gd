@@ -31,6 +31,7 @@ const SERVER_PATH := "https://quiver.dev"
 ## URLs for posting and retrieving scores
 const POST_SCORE_PATH := "/leaderboards/%s/scores/post/"
 const GET_SCORES_PATH := "/leaderboards/%s/scores/"
+const GET_SCORES_WITH_PLAYER_PATH = "/leaderboards/%s/scores-with-player/"
 const GET_PLAYER_SCORES_PATH := "/leaderboards/%s/scores/player/"
 const GET_NEARBY_SCORES_PATH := "/leaderboards/%s/scores/nearby/"
 const MIN_UNIX_TIME := 0
@@ -137,6 +138,8 @@ func post_score(leaderboard_id: String, score: float) -> bool:
 ##       to the time period, if any.
 ##     "timestamp": A float. The UNIX time in seconds when this score was posted.
 ##     "metadata": A dictionary. Includes any metadata that was attached to this score when it was posted.
+##     "is_current_player": A bool. Returns true if the current player is logged in and this score belongs
+##        to that player.
 ## "has_more_scores" is a Boolean specifying whether there are more available scores to fetch.
 ## "error" is a string with an error message if present or empty otherwise
 ## Example return value:
@@ -152,7 +155,14 @@ func get_scores(leaderboard_id: String, offset := 0, limit := 10, start_time := 
 	if not _validate_score_params(offset, limit):
 		return {"scores": [], "has_more_scores": false, "error": "Error validating parameters"}
 	var query_string := "?offset=%d&limit=%d&start_time=%f&end_time=%f" % [offset, limit, start_time, end_time]
-	return await _get_scores_base(leaderboard_id, auth_token, GET_SCORES_PATH, query_string)
+	var path_to_use := GET_SCORES_PATH
+	var token = auth_token
+	# If we have a logged in player, we use a separate URL and player's auth token
+	# to fetch results with
+	if PlayerAccounts.player_token:
+		path_to_use = GET_SCORES_WITH_PLAYER_PATH
+		token = PlayerAccounts.player_token
+	return await _get_scores_base(leaderboard_id, token, path_to_use, query_string)
 
 
 ## Get scores for the current guest player or logged in player.

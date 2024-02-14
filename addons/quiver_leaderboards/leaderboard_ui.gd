@@ -26,6 +26,8 @@ extends Control
 ## when using the nearby score filter.
 ## Only applicable when the leaderboard is using the "All scores" update strategy.
 @export var nearby_anchor := Leaderboards.NearbyAnchor.BEST
+## The color to highlight the current player's scores.
+@export var current_player_highlight_color := Color("#005216")
 
 @onready var next_button := %NextButton
 @onready var prev_button := %PrevButton
@@ -69,6 +71,9 @@ func refresh_scores():
 			row.set_text(0, str(score["rank"]))
 			row.set_text(1, str(score["name"]))
 			row.set_text(2, str(score["score"]))
+			if score["is_current_player"]:
+				for i in range(3):
+					row.set_custom_bg_color(i, current_player_highlight_color)
 	else:
 		var row: TreeItem = score_list.create_item(root)
 		if score_data["error"]:
