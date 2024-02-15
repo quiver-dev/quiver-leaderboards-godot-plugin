@@ -17,11 +17,11 @@ extends Control
 		#refresh_scores()
 ## The offset from the first high score
 @export var score_offset := 0
-## Fetch up to a maximum of this many scores
-@export var score_limit := 10
+## Fetch up to a maximum of this many scores.
+@export_range(1, 50) var score_limit := 10
 ## Fetch this many scores below and this many scores above the player's score
 ## when using the nearby score filter.
-@export var nearby_count := 5
+@export_range(1, 25) var nearby_count := 5
 ## Sets whether scores are fetched near the player's best or latest score
 ## when using the nearby score filter.
 ## Only applicable when the leaderboard is using the "All scores" update strategy.

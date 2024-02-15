@@ -7,7 +7,7 @@ extends Node
 ## * All scores: Records all posted scores
 ## * Best score: Only record each player's best score
 ## * Latest score: Only record each player's latest score
-## * Cumulative score: Record the cumulative (sum) of each player's scores
+## * Cumulative score: Record the sum of each player's scores
 ##
 ## If a score fails to post, this class can be configured to handle retries.
 ## If the game is exited, this class will handle saving scores to disk for a later retry.
@@ -79,6 +79,12 @@ func post_guest_score(leaderboard_id: String, score: float, nickname := "", meta
 	if _http_request_busy:
 		printerr("Couldn't post score because request is in progress")
 		success = false
+
+	if nickname.length() > 15:
+		success = false
+		printerr("Couldn't post score because nickname is greater than 15 characters")
+		# Return because this score shouldn't be retried
+		return success
 
 	if success:
 		_http_request_busy = true
