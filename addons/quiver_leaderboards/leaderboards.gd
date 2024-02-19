@@ -51,6 +51,8 @@ func _ready() -> void:
 	if not get_tree().root.has_node("PlayerAccounts"):
 		printerr("[Quiver Leaderboards] PlayerAccounts plugin must be installed to use Leaderboards. See documentation for details.")
 
+	await PlayerAccounts.ready
+
 	_load_failed_queue_from_disk()
 	if not _failed_queue.is_empty():
 		_process_failed_queue()

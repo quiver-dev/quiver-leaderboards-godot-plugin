@@ -29,10 +29,10 @@ This plugin requires Godot 4.0 or later. It's been designed to work with GDScrip
 * Create an account on [quiver.dev](https://quiver.dev), if you haven't already.
 * [Create a project](https://quiver.dev/projects/up/) on Quiver associated with your game, if you haven't already.
 * Go to your project's leaderboards dashboard on the [Quiver Leaderboards page](https://quiver.dev/leaderboards/), go to the Settings tab, and copy the authentication token and then go to your Godot editor -> Project Settings -> Quiver -> General and paste your auth token.
-* Next, create a new test leaderboard. Call it whatever you'd like. After you create it, copy the leaderboard's ID.
+* Next, create a new test leaderboard. Call it whatever you'd like. After you create it, copy the leaderboard's ID from the Leaderboard settings page.
 
 ### Test it!
-* Somewhere in your game's code, add the following code: `Leaderboards.post_guest_score(<your leaderboard id>, 100, "Test Player")`
+* Somewhere in your game's code, add the following code: `await Leaderboards.post_guest_score(<your leaderboard id>, 100, "Test Player")`
 * Once you've run the code, [view the dashboard](https://quiver.dev/leaderboards/) to see the new score.
 
 ## Usage
@@ -42,7 +42,7 @@ The `Leaderboards` autoload is added to your project automatically when you enab
 
 To post a score for a guest player account, call:
 
-	Leaderboards.post_guest_score(leaderboard_id, score, nickname, metadata, timestamp, automatically_retry)
+	await Leaderboards.post_guest_score(leaderboard_id, score, nickname, metadata, timestamp, automatically_retry)
 
 where:
 
