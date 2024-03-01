@@ -74,19 +74,24 @@ func _ready() -> void:
 ## If this operation failed and automatically_retry is true, you do not need to post it again.
 ## The built-in retry mechanism will try again until the operation succeeeds, even across game restarts.
 func post_guest_score(leaderboard_id: String, score: float, nickname := "", metadata := {}, timestamp := 0.0, automatically_retry := true) -> bool:
+	var retry := automatically_retry
+
 	var success := true
-	if not PlayerAccounts.is_logged_in():
-		success = await PlayerAccounts.register_guest()
 
-	if _http_request_busy:
-		printerr("Couldn't post score because request is in progress")
-		success = false
-
-	if nickname.length() > 15:
+	if success and nickname.length() > 15:
 		success = false
 		printerr("Couldn't post score because nickname is greater than 15 characters")
-		# Return because this score shouldn't be retried
-		return success
+		# Don't retry since this will never work
+		retry = false
+
+	if success and not PlayerAccounts.is_logged_in():
+		success = await PlayerAccounts.register_guest()
+		if not success:
+			printerr("Couldn't register guest account")
+
+	if success and _http_request_busy:
+		printerr("Couldn't post score because request is in progress")
+		success = false
 
 	if success:
 		_http_request_busy = true
@@ -106,18 +111,23 @@ func post_guest_score(leaderboard_id: String, score: float, nickname := "", meta
 			})
 		)
 		if error != OK:
-			_http_request_busy = false
 			printerr("[Quiver Leaderboards] There was an error posting a score.")
 			success = false
 		else:
 			var response = await http_request.request_completed
-			_http_request_busy = false
 			var response_code = response[1]
-			if response_code < 200 or response_code >= 300:
+			if response_code >= 500:
 				printerr("[Quiver Leaderboards] There was an error posting a score.")
 				success = false
+			# A 4xx error means retrying this request is futile, so we should drop it,
+			# regardless of the automatically_retry option.
+			elif response_code >= 400:
+				printerr("[Quiver Leaderboards] There was an irrecoverable error posting a score.")
+				retry = false
+				success = false
+		_http_request_busy = false
 
-	if not success and automatically_retry:
+	if not success and retry:
 		_handle_failed_post("guest", leaderboard_id, float(score), nickname, metadata, timestamp)
 
 	return success

@@ -87,11 +87,11 @@ func _on_get_nearby_scores_button_pressed() -> void:
 
 
 func _on_quit_button_pressed() -> void:
-	PlayerAccounts.logout()
+	PlayerAccounts.log_out()
 	get_tree().quit()
 
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		PlayerAccounts.logout()
+		PlayerAccounts.log_out()
 		get_tree().quit()
